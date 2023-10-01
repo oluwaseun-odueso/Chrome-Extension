@@ -1,5 +1,5 @@
 const multer = require('multer');
-const { AWS } = require('aws-sdk');
+const { S3 } = require('aws-sdk');
 const dotenv = require('dotenv');
 
 dotenv.config();
@@ -14,15 +14,15 @@ const upload = multer({
       fileFilter: (req, file, cb) => {
          const allowedMimeTypes = ['image/jpeg', 'image/png', 'image/gif'];
          if (allowedMimeTypes.includes(file.mimetype)) {
-         cb(null, true);
+            cb(null, true);
          } else {
-         cb(new Error('Invalid file type.'));
+            cb(new Error('Invalid file type.'));
          }
       },
    });
 
 // Set up an Amazon S3 client
-const s3 = new AWS.S3({
+const s3 = new S3({
    accessKeyId: process.env.AWS_ACCESS_KEY,
    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
   });

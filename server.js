@@ -80,7 +80,7 @@ app.post('/upload', upload.array('video', 10), async (req, res) => {
   }
 });
 
-app.use('/videos/:key', async (req, res) => {
+app.get('/videos/:key', async (req, res) => {
   const videoKey = req.params.key;
   try {
     const downloadParams = {
