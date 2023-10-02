@@ -4,6 +4,15 @@ const dotenv = require('dotenv');
 
 dotenv.config();
 
+const allowedMimeTypes = [
+   'video/mp4',
+   'video/webm',
+   'video/ogg',
+   'video/quicktime',
+   'video/x-msvideo',
+   'video/x-flv',
+   'video/x-matroska',
+];
 
 // Set up multer to handle file uploads
 const upload = multer({
@@ -15,7 +24,7 @@ const upload = multer({
          if (allowedMimeTypes.includes(file.mimetype)) {
             cb(null, true);
          } else {
-            cb(new Error('Invalid file type.'));
+            cb(new Error('Invalid video file type.'));
          }
       },
    });

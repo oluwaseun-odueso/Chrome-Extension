@@ -1,6 +1,10 @@
 const express = require('express');
 const cors = require('cors');
-const { SpeechClient } = require('@google-cloud/speech');
+const fs = require('fs')
+const https = require('https')
+const { execSync: exec } = require('child_process')
+const { Deepgram } = require('@deepgram/sdk')
+const ffmpegStatic = require('ffmpeg-static')
 const dotenv = require('dotenv');
 const { upload, s3 } = require('./middleware/multer');
 
@@ -8,35 +12,48 @@ dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const speechClient = new SpeechClient();
+const deepgram = new Deepgram(process.env.CHROME_EXTENSION_PROJECT)
 
 app.use(cors({ origin: '*' }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-async function transcribeVideo(buffer) {
-   const audioBytes = buffer.toString('base64');
-   const audio = { content: audioBytes };
+async function ffmpeg(command) {
+   return new Promise((resolve, reject) => {
+     exec(`"${ffmpegStatic}" ${command}`, (err, stderr, stdout) => {
+       if (err) reject(err);
+       resolve(stdout);
+     });
+   });
+}
+ 
 
-   const config = {
-      encoding: 'LINEAR16',
-      sampleRateHertz: 16000,
-      languageCode: 'en-US',
+async function transcribeLocalVideo(filePath) {
+   ffmpeg(`-hide_banner -y -i "${filePath}" "${filePath}.wav"`);
+ 
+   const audioFile = {
+     buffer: fs.readFileSync(`${filePath}.wav`),
+     mimetype: 'audio/wav',
    };
+   const response = await deepgram.transcription.preRecorded(audioFile, {
+     punctuation: true,
+   });
+   return response.results;
+}
+ 
 
-  const request = { audio, config };
-
-   try {
-      const [response] = speechClient.recognize(request);
-      const transcription = response.results
-         .map(result => result.alternatives[0].transcript)
-         .join('\n');
-
-      return transcription;
-   } catch (error) {
-      console.error('Error transcribing video:', error);
-      throw error;
-   }
+async function downloadFile(url) {
+   return new Promise((resolve, reject) => {
+      const request = https.get(url, (response) => {
+         const fileName = url.split('/').slice(-1)[0] // Get the final part of the URL only
+         const fileStream = fs.createWriteStream(fileName)
+         response.pipe(fileStream)
+         response.on('end', () => {
+         fileStream.close()
+         resolve(fileName)
+         })
+      })
+   })
 }
 
 app.post('/upload', upload.array('video', 10), async (req, res) => {
@@ -54,7 +71,10 @@ app.post('/upload', upload.array('video', 10), async (req, res) => {
       };
 
       const result = await s3.upload(uploadParams).promise();
-      const transcription = await transcribeVideo(file.buffer);
+      // const transcription = await transcribeVideo(file.buffer);
+      const filePath = await downloadFile(result.Location)
+      const transcription = await transcribeLocalVideo(filePath)
+      console.dir(transcription, { depth: null })
 
       const videoKey = result.Key;
       const videoStream = s3.getObject({
@@ -62,13 +82,6 @@ app.post('/upload', upload.array('video', 10), async (req, res) => {
          Key: videoKey,
       }).createReadStream();
 
-      // Headers for video streaming
-      res.writeHead(200, {
-         'Content-Type': 'video/mp4',
-         'Accept-Ranges': 'bytes',
-      });
-
-      // Pipe the video stream to the response
       videoStream.pipe(res);
 
 
@@ -90,7 +103,9 @@ app.post('/upload', upload.array('video', 10), async (req, res) => {
       res.send(result.Key, result.Location, videoPlayer + transcriptionSection);
    } catch (error) {
       console.error('Error handling video upload:', error);
-      res.status(500).send('Internal Server Error');
+      res.status(500).json({
+         success: false, errorMessage:'Internal Server Error'
+      });
    }
 });
 
