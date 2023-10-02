@@ -9,10 +9,9 @@ dotenv.config();
 const upload = multer({
       storage: multer.memoryStorage(),
       limits: {
-         fileSize: 10 * 1024 * 1024, // 10 MB
+         fileSize: 50 * 1024 * 1024, // 50 MB
       },
       fileFilter: (req, file, cb) => {
-         const allowedMimeTypes = ['image/jpeg', 'image/png', 'image/gif'];
          if (allowedMimeTypes.includes(file.mimetype)) {
             cb(null, true);
          } else {

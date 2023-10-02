@@ -27,7 +27,7 @@ async function transcribeVideo(buffer) {
   const request = { audio, config };
 
    try {
-      const [response] = await speechClient.recognize(request);
+      const [response] = speechClient.recognize(request);
       const transcription = response.results
          .map(result => result.alternatives[0].transcript)
          .join('\n');
@@ -87,7 +87,7 @@ app.post('/upload', upload.array('video', 10), async (req, res) => {
          </div>
       `;
 
-      res.send(result.Key, videoPlayer + transcriptionSection);
+      res.send(result.Key, result.Location, videoPlayer + transcriptionSection);
    } catch (error) {
       console.error('Error handling video upload:', error);
       res.status(500).send('Internal Server Error');
